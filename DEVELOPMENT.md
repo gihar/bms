@@ -1,0 +1,308 @@
+# Development Guide
+
+## Setup for Development
+
+### Prerequisites
+- Python 3.9+
+- Git
+- Telegram account with bot token from @BotFather
+
+### Local Development Setup
+
+1. Clone the repository:
+```bash
+git clone <repository_url>
+cd bms
+```
+
+2. Create and activate virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Create environment file:
+```bash
+cp .env.example .env
+# Edit .env with your bot token and database settings
+```
+
+5. Initialize database:
+```bash
+python -c "from bot.models.database import init_db; init_db()"
+```
+
+6. Run the bot:
+```bash
+python bot/main.py
+```
+
+## Project Structure
+
+```
+bms/
+├── bot/                       # Main bot package
+│   ├── __init__.py
+│   ├── main.py               # Entry point with bot initialization
+│   ├── handlers/             # Telegram message and callback handlers
+│   │   ├── __init__.py
+│   │   ├── message_handler.py
+│   │   └── callback_handler.py
+│   ├── services/             # Business logic layer
+│   │   ├── __init__.py
+│   │   ├── parser.py         # Text parsing logic
+│   │   ├── checklist_manager.py
+│   │   ├── business_connection_service.py
+│   │   └── user_whitelist_service.py
+│   ├── models/               # Database models
+│   │   ├── __init__.py
+│   │   └── database.py
+│   └── utils/                # Utilities and configuration
+│       ├── __init__.py
+│       └── config.py
+├── .env                      # Environment variables (not committed)
+├── .env.example              # Environment variables template
+├── requirements.txt          # Python dependencies
+├── README.md                 # User documentation
+├── CLAUDE.md                 # Project insights and best practices
+├── DEVELOPMENT.md            # This file
+└── venv/                     # Virtual environment (not committed)
+```
+
+## Code Style and Standards
+
+### Python Style Guide
+- Follow PEP 8 style guidelines
+- Use 4 spaces for indentation
+- Maximum line length: 100 characters
+- Use type hints where appropriate
+
+### Naming Conventions
+- Classes: PascalCase (e.g., `TextParser`)
+- Functions and variables: snake_case (e.g., `parse_text`)
+- Private members: prefix with underscore (e.g., `_internal_method`)
+- Constants: UPPER_SNAKE_CASE (e.g., `BOT_TOKEN`)
+
+### Documentation Standards
+- All public functions and classes must have docstrings
+- Use Google-style docstrings
+- Include type hints in function signatures
+- Document complex algorithms in comments
+
+## Testing Guidelines
+
+### Running Tests
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-mock
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=bot --cov-report=html
+```
+
+### Test Structure
+```python
+# Example test file: tests/test_parser.py
+import pytest
+from bot.services.parser import TextParser
+
+class TestTextParser:
+    def test_parse_comma_separated(self):
+        result = TextParser.parse_text("Milk, Bread, Cheese")
+        assert result == ["Milk", "Bread", "Cheese"]
+
+    def test_parse_numbered_list(self):
+        text = "1. Buy milk\n2. Buy bread"
+        result = TextParser.parse_text(text)
+        assert result == ["Buy milk", "Buy bread"]
+```
+
+## Database Operations
+
+### Adding New Models
+1. Define model in `bot/models/database.py`
+2. Import and add to Base.metadata in `init_db()`
+3. Create migration if using Alembic
+
+### Database Sessions
+Always use the context manager for database sessions:
+```python
+from bot.models.database import get_db
+
+def create_checklist(data):
+    db = next(get_db())
+    try:
+        # Database operations
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+```
+
+## Debugging
+
+### Debug Mode
+The bot includes debug middleware that logs all incoming updates. To add more debugging:
+
+```python
+# Add custom logging
+logger = logging.getLogger(__name__)
+logger.debug("Debug information: %s", variable)
+```
+
+### Common Debugging Scenarios
+
+1. **Bot not receiving messages**:
+   - Check bot token is correct
+   - Verify bot is running
+   - Check Telegram Bot API status
+
+2. **Database issues**:
+   - Verify DATABASE_URL in .env
+   - Check database file permissions
+   - Review SQLAlchemy logs
+
+3. **Parser not working**:
+   - Test parser in isolation
+   - Check regex patterns
+   - Verify input sanitization
+
+## Contributing
+
+### Pull Request Process
+
+1. Fork the repository
+2. Create a feature branch:
+```bash
+git checkout -b feature/new-feature
+```
+
+3. Make your changes following the coding standards
+4. Add tests for new functionality
+5. Run tests and ensure they pass:
+```bash
+pytest
+```
+
+6. Commit your changes:
+```bash
+git commit -m "feat: add new feature description"
+```
+
+7. Push to your fork:
+```bash
+git push origin feature/new-feature
+```
+
+8. Create a pull request
+
+### Commit Message Format
+Use conventional commits format:
+- `feat:` for new features
+- `fix:` for bug fixes
+- `docs:` for documentation changes
+- `style:` for formatting changes
+- `refactor:` for refactoring
+- `test:` for adding tests
+- `chore:` for maintenance tasks
+
+Example:
+```
+feat: add checklist sharing functionality
+
+- Add sharing endpoint in handlers
+- Implement permission checking
+- Update database schema
+```
+
+## Deployment
+
+### Production Deployment Checklist
+
+1. **Environment Setup**
+   - [ ] Set production environment variables
+   - [ ] Use production database (PostgreSQL recommended)
+   - [ ] Set up SSL certificates if using webhooks
+
+2. **Database**
+   - [ ] Run database migrations
+   - [ ] Set up regular backups
+   - [ ] Configure connection pooling
+
+3. **Monitoring**
+   - [ ] Set up logging aggregation
+   - [ ] Configure error alerts
+   - [ ] Monitor bot uptime
+
+4. **Security**
+   - [ ] Review and restrict bot permissions
+   - [ ] Set up rate limiting
+   - [ ] Validate all inputs
+
+### Docker Deployment
+
+Create a `Dockerfile`:
+```dockerfile
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+CMD ["python", "bot/main.py"]
+```
+
+Create a `docker-compose.yml`:
+```yaml
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: checklist_bot
+      POSTGRES_USER: bot_user
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+## Performance Optimization
+
+### Database Optimization
+- Use indexes on frequently queried columns
+- Implement connection pooling
+- Consider read replicas for high traffic
+
+### Bot Optimization
+- Implement caching for frequent operations
+- Use async/await consistently
+- Limit message processing time
+
+### Monitoring
+- Track response times
+- Monitor error rates
+- Set up alerts for unusual activity
