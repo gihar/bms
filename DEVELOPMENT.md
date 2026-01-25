@@ -80,7 +80,15 @@ bms/
 - Follow PEP 8 style guidelines
 - Use 4 spaces for indentation
 - Maximum line length: 100 characters
-- Use type hints where appropriate
+- Use type hints where appropriate (all service layer methods have type hints)
+
+### aiogram Best Practices
+- Use routers for modular handler organization (`bot/handlers/`)
+- Implement middleware for cross-cutting concerns (`DebugMiddleware`)
+- Use filter-based routing (`F.text.startswith()`, `F.text`)
+- Separate business message handlers from regular message handlers
+- Use `@router.business_connection()` for business connection events
+- Use `@router.business_message()` for business messages
 
 ### Naming Conventions
 - Classes: PascalCase (e.g., `TextParser`)
@@ -107,6 +115,33 @@ pytest
 # Run with coverage
 pytest --cov=bot --cov-report=html
 ```
+
+## Bot API Specifics
+
+### Native Telegram Checklists
+The bot uses Telegram Bot API 7.0+ native checklist feature:
+- `aiogram.types.InputChecklist` - main checklist object
+- `aiogram.types.InputChecklistTask` - individual task
+- `bot.send_checklist()` - sends checklist via business connection
+- Task text limited to 100 characters (Telegram API requirement)
+- Checklist titles auto-generated with timestamp
+
+### Business Connection Handling
+```python
+# Business connection is captured automatically
+@router.business_connection()
+async def handle_business_connection(connection: types.BusinessConnection):
+    business_service.save_connection(connection.id, connection.user.id)
+
+# Business messages are handled separately
+@router.business_message(F.text)
+async def handle_business_message(message: types.Message):
+    # Only processes if user is in whitelist
+    if whitelist_service.is_user_allowed(username, user_id):
+        # Create and send checklist
+```
+
+## Testing Guidelines
 
 ### Test Structure
 ```python
@@ -161,6 +196,35 @@ logger = logging.getLogger(__name__)
 logger.debug("Debug information: %s", variable)
 ```
 
+## Service Layer Architecture
+
+### Available Services
+- `TextParser` - Parses various text formats into task lists
+- `ChecklistManager` - CRUD operations for checklists and tasks
+- `BusinessConnectionService` - Manages business connection state
+- `UserWhitelistService` - Manages allowed users for business accounts
+
+### Service Usage Pattern
+```python
+# Services manage their own database sessions
+service = BusinessConnectionService()
+connection_id = service.get_active_connection()
+
+# Services return structured data
+info = service.get_connection_info()  # Returns dict or None
+```
+
+## Debugging
+
+### Debug Mode
+The bot includes debug middleware that logs all incoming updates. To add more debugging:
+
+```python
+# Add custom logging
+logger = logging.getLogger(__name__)
+logger.debug("Debug information: %s", variable)
+```
+
 ### Common Debugging Scenarios
 
 1. **Bot not receiving messages**:
@@ -168,12 +232,24 @@ logger.debug("Debug information: %s", variable)
    - Verify bot is running
    - Check Telegram Bot API status
 
-2. **Database issues**:
+2. **Business connection not working**:
+   - Verify bot is connected to business account
+   - Check `/business` command response
+   - Review business connection in database
+   - Ensure user is in whitelist
+
+3. **Checklist not being created**:
+   - Verify message has at least 2 tasks
+   - Check if user is in whitelist
+   - Review debug logs for parser output
+   - Verify business connection is active
+
+4. **Database issues**:
    - Verify DATABASE_URL in .env
    - Check database file permissions
    - Review SQLAlchemy logs
 
-3. **Parser not working**:
+5. **Parser not working**:
    - Test parser in isolation
    - Check regex patterns
    - Verify input sanitization

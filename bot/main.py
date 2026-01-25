@@ -35,6 +35,7 @@ class DebugMiddleware(BaseMiddleware):
     ) -> Any:
         logger.info("=" * 60)
         logger.info("ПОЛУЧЕНО ОБНОВЛЕНИЕ")
+        logger.info(f"   Update ID: {event.update_id}")
         
         if hasattr(event, 'business_message') and event.business_message:
             msg = event.business_message
@@ -43,6 +44,13 @@ class DebugMiddleware(BaseMiddleware):
             logger.info(f"   Chat ID: {msg.chat.id}")
             logger.info(f"   Chat type: {msg.chat.type}")
             logger.info(f"   Text: {msg.text}")
+        elif hasattr(event, 'message_reaction') and event.message_reaction:
+            reaction = event.message_reaction
+            logger.info("ЭТО РЕАКЦИЯ НА СООБЩЕНИЕ!")
+            logger.info(f"   Chat ID: {reaction.chat.id}")
+            logger.info(f"   Message ID: {reaction.message_id}")
+            logger.info(f"   New reactions: {reaction.new_reaction}")
+            logger.info(f"   Old reactions: {reaction.old_reaction}")
         elif hasattr(event, 'message') and event.message:
             msg = event.message
             logger.info("ЭТО ОБЫЧНОЕ СООБЩЕНИЕ (не бизнес)")
@@ -51,7 +59,11 @@ class DebugMiddleware(BaseMiddleware):
             logger.info(f"   Business connection ID: {msg.business_connection_id}")
             logger.info(f"   Text: {msg.text}")
         else:
+            # Логируем все доступные поля для диагностики
             logger.info(f"   Тип события: {type(event).__name__}")
+            for attr in ['message_reaction', 'message_reaction_count', 'edited_message', 'callback_query']:
+                if hasattr(event, attr) and getattr(event, attr):
+                    logger.info(f"   Найдено поле: {attr}")
         
         logger.info("=" * 60)
         
@@ -103,7 +115,7 @@ async def main():
     try:
         await dp.start_polling(
             bot,
-            allowed_updates=["message", "business_message", "business_connection", "edited_message", "callback_query"]
+            allowed_updates=["message", "business_message", "business_connection", "edited_message", "callback_query", "message_reaction"]
         )
     finally:
         logger.info("Остановка бота...")

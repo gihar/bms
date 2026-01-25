@@ -10,10 +10,10 @@ This is a Telegram bot that converts text messages into interactive checklists. 
 
 1. **Core Functionality**
    - ✅ Smart text parsing supporting multiple formats
-   - ✅ Interactive checklist creation with inline buttons
-   - ✅ Task completion tracking
+   - ✅ Native Telegram checklist creation using `send_checklist()` API
+   - ✅ Task completion tracking via Telegram's native checklist UI
    - ✅ Database persistence using SQLAlchemy 2.0
-   - ✅ Support for regular Telegram accounts
+   - ✅ Support for regular Telegram accounts (for admin commands)
 
 2. **Business Account Integration**
    - ✅ Business connection detection and management
@@ -28,13 +28,34 @@ This is a Telegram bot that converts text messages into interactive checklists. 
    - ✅ Markdown checkboxes (- [ ] item)
    - ✅ Newline-separated items
    - ✅ Semicolon-separated items
+   - ✅ Pipe-separated items (item | item)
+   - ✅ "и" separator (item и item)
+   - ✅ "+" separator (item + item)
    - ✅ Smart title generation
+   - ✅ Task text truncation to 100 characters (Telegram API limit)
 
 4. **Database Schema**
    - ✅ Checklists table with user tracking
    - ✅ Tasks table with position and completion status
    - ✅ Business connections table
    - ✅ Allowed users table for whitelist
+
+## Admin Commands
+
+The bot provides comprehensive admin commands for whitelist management:
+
+### Command List
+- `/start` - Welcome message and basic instructions
+- `/help` - Detailed help with all commands
+- `/business` - Check business connection status
+- `/adduser @username or ID` - Add user to whitelist (owner only)
+- `/removeuser @username or ID` - Remove user from whitelist (owner only)
+- `/users` - List all allowed users (owner only)
+
+### Access Control
+- Only the business account owner (from active connection) can manage whitelist
+- User identification supports both `@username` and numeric Telegram IDs
+- Username matching is case-insensitive
 
 ## Architecture Decisions
 
@@ -47,15 +68,28 @@ The project follows a clean architecture with clear separation of concerns:
 
 ### 2. Smart Parser Implementation
 The `TextParser` class uses regex patterns to detect input formats:
-- Priority order: numbered → bulleted → comma-separated → semicolon → newline
+- Priority order: numbered → bulleted → comma-separated → semicolon → newline → other separators
 - Handles nested expressions (ignores commas in brackets)
+- Additional separators: pipe (`|`), "и" (Russian "and"), plus (`+`)
 - Generates meaningful titles based on task count
+- Task text automatically truncated to 100 characters (Telegram Bot API limit)
 
-### 3. Business Account Support
+### 3. Native Telegram Checklists
+The bot uses Telegram's Bot API 7.0+ native checklist feature:
+- Uses `send_checklist()` method via `aiogram.types.InputChecklist`
+- Creates `InputChecklistTask` objects for each parsed task
+- Automatically adds timestamp to checklist titles ("Список от DD.MM.YYYY HH:MM")
+- Checklists are sent via business connection with `reply_parameters`
+- Task completion is handled natively by Telegram client
+- Tasks are limited to 100 characters per Telegram API requirements
+
+### 4. Business Account Integration
 The bot seamlessly handles both regular and business accounts:
-- Detects business connections automatically
+- Detects business connections automatically via `@router.business_connection()`
 - Maintains separate whitelist for business users
 - Preserves business connection state in database
+- Admin commands work in private chat, checklist creation in business chats
+- Supports only one active business connection at a time
 
 ## Best Practices Implemented
 
@@ -87,9 +121,11 @@ The bot seamlessly handles both regular and business accounts:
 - Proper relationship definitions
 
 ### 3. Telegram Bot API Utilization
-- Inline keyboards for interactive elements
-- Callback data encoding for state management
-- Business connection API integration
+- Native checklists using `send_checklist()` API (Bot API 7.0+)
+- `InputChecklist` and `InputChecklistTask` for checklist creation
+- Business connection API integration with `@router.business_connection()`
+- Separate handlers for business messages vs regular messages
+- `ReplyParameters` for replying to original business message
 
 ## Testing Strategy
 

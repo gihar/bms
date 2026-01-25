@@ -46,6 +46,20 @@ class AllowedUser(Base):
     added_at = Column(DateTime, default=datetime.utcnow)
     added_by = Column(Integer, nullable=False)  # user_id владельца
 
+
+class PendingMessage(Base):
+    """Сообщения, ожидающие реакции для создания чек-листа"""
+    __tablename__ = "pending_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, nullable=False)
+    message_id = Column(Integer, nullable=False)
+    business_connection_id = Column(String, nullable=False)
+    text = Column(String, nullable=False)
+    user_id = Column(Integer, nullable=False)  # ID отправителя сообщения
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
