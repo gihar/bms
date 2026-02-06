@@ -39,7 +39,8 @@ class TextParser:
                     return [task.strip() for task in bullet_matches if task.strip()]
 
         # Проверяем разделенные запятыми (игнорируем запятые внутри скобок)
-        if ',' in text:
+        # (только если нет переносов строк - иначе это формат с переносами)
+        if ',' in text and '\n' not in text:
             # Разбиваем по запятым, но не внутри скобок
             parts = []
             current = ""
@@ -58,17 +59,22 @@ class TextParser:
                     current += char
             if current.strip():
                 parts.append(current.strip())
-            
+
             # Возвращаем только если получилось больше одной части
             if len(parts) > 1:
                 return [task for task in parts if task]
 
         # Проверяем разделенные точкой с запятой
-        if ';' in text:
+        # (только если нет переносов строк - иначе это формат с переносами)
+        if ';' in text and '\n' not in text:
             return [task.strip() for task in text.split(';') if task.strip()]
 
-        # Разделяем по строкам
+        # Разделяем по строкам (новый формат: простой перенос строки)
         lines = [line.strip() for line in text.split('\n') if line.strip()]
+
+        # Если получилось много строк - это формат с переносами
+        if len(lines) >= 2:
+            return lines
 
         # Если это одна строка, пробуем разделить по разным разделителям
         if len(lines) == 1:
