@@ -104,6 +104,11 @@ bms/
 
 ## Testing Guidelines
 
+### Current Testing Status
+- **Status**: No automated tests implemented yet
+- **Testing Method**: Manual testing through Telegram interface
+- **Visibility**: Debug logging provides runtime visibility
+
 ### Running Tests
 ```bash
 # Install test dependencies
@@ -116,49 +121,98 @@ pytest
 pytest --cov=bot --cov-report=html
 ```
 
-## Bot API Specifics
-
-### Native Telegram Checklists
-The bot uses Telegram Bot API 7.0+ native checklist feature:
-- `aiogram.types.InputChecklist` - main checklist object
-- `aiogram.types.InputChecklistTask` - individual task
-- `bot.send_checklist()` - sends checklist via business connection
-- Task text limited to 100 characters (Telegram API requirement)
-- Checklist titles auto-generated with timestamp
-
-### Business Connection Handling
+### Recommended Test Structure
 ```python
-# Business connection is captured automatically
-@router.business_connection()
-async def handle_business_connection(connection: types.BusinessConnection):
-    business_service.save_connection(connection.id, connection.user.id)
-
-# Business messages are handled separately
-@router.business_message(F.text)
-async def handle_business_message(message: types.Message):
-    # Only processes if user is in whitelist
-    if whitelist_service.is_user_allowed(username, user_id):
-        # Create and send checklist
-```
-
-## Testing Guidelines
-
-### Test Structure
-```python
-# Example test file: tests/test_parser.py
-import pytest
-from bot.services.parser import TextParser
-
+# tests/test_parser.py - TextParser class tests
 class TestTextParser:
     def test_parse_comma_separated(self):
+        """Test comma-separated format"""
         result = TextParser.parse_text("Milk, Bread, Cheese")
         assert result == ["Milk", "Bread", "Cheese"]
 
     def test_parse_numbered_list(self):
+        """Test numbered list format"""
         text = "1. Buy milk\n2. Buy bread"
         result = TextParser.parse_text(text)
         assert result == ["Buy milk", "Buy bread"]
+
+    def test_parse_bulleted_list(self):
+        """Test bulleted list format"""
+        text = "• Milk\n• Bread\n• Cheese"
+        result = TextParser.parse_text(text)
+        assert result == ["Milk", "Bread", "Cheese"]
+
+    def test_parse_pipe_separator(self):
+        """Test pipe-separated format"""
+        result = TextParser.parse_text("Buy milk | Buy bread")
+        assert result == ["Buy milk", "Buy bread"]
+
+    def test_parse_russian_and(self):
+        """Test Russian 'и' separator"""
+        result = TextParser.parse_text("Купить молоко и хлеб")
+        assert result == ["Купить молоко", "Купить хлеб"]
+
+    def test_parse_with_brackets(self):
+        """Test comma inside brackets is preserved"""
+        result = TextParser.parse_text("Buy (milk, bread), cheese")
+        assert "Buy (milk, bread)" in result
+        assert "cheese" in result
+
+# tests/test_services.py - Service layer tests
+class TestUserWhitelistService:
+    def test_add_user_username(self):
+        """Test adding user by username"""
+        service = UserWhitelistService()
+        success, msg = service.add_user("@testuser", 12345)
+        assert success is True
+
+    def test_is_user_allowed(self):
+        """Test whitelist checking"""
+        service = UserWhitelistService()
+        # Add user then check
+        service.add_user("@testuser", 12345)
+        assert service.is_user_allowed("testuser") is True
+
+class TestBusinessConnectionService:
+    def test_save_connection(self):
+        """Test saving business connection"""
+        service = BusinessConnectionService()
+        connection = service.save_connection("conn_123", 12345)
+        assert connection.is_active is True
+
+# tests/test_models.py - Database model tests
+class TestChecklistModel:
+    def test_create_checklist(self):
+        """Test checklist creation"""
+        checklist = Checklist(user_id=123, title="Test List")
+        assert checklist.title == "Test List"
+
+# tests/conftest.py - Test configuration
+import pytest
+from bot.models.database import Base, engine
+
+@pytest.fixture(scope="session")
+def db_engine():
+    """Database engine for tests"""
+    return engine
+
+@pytest.fixture
+def db_session(db_engine):
+    """Database session for tests"""
+    from sqlalchemy.orm import sessionmaker
+    Session = sessionmaker(bind=db_engine)
+    session = Session()
+    try:
+        yield session
+    finally:
+        session.close()
 ```
+
+### Test Coverage Recommendations
+- **test_parser.py**: All separator formats, edge cases (empty input, single item, special characters)
+- **test_services.py**: Whitelist operations, business connection lifecycle, checklist CRUD
+- **test_handlers.py**: Command handlers, business message flow, reaction handling
+- **test_models.py**: Database schema, relationships, query performance
 
 ## Database Operations
 
